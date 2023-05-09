@@ -1,0 +1,15 @@
+{
+    "name": "C# (.NET)",
+    
+    "image": "mcr.microsoft.com/devcontainers/dotnet:6.0",
+    
+    "customizations": {
+        // Configure properties specific to VS Code.
+        "vscode": {
+            "settings": {},
+            "extensions": [
+                "ms-vscode.csharp"
+            ]
+        }
+    }
+}
