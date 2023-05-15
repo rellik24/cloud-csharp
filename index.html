@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Local Storage Example</title>
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script>
+		const accessToken = localStorage.getItem('accessToken');
+		if (accessToken) {
+			document.addEventListener('DOMContentLoaded', () => {
+				document.getElementById('a-page').style.display = 'block';
+				// document.getElementById('username').textContent = "";
+			});
+		} else {
+			document.addEventListener('DOMContentLoaded', () => {
+				document.getElementById('b-page').style.display = 'block';
+			});
+		}
+	</script>
+	<style>
+		table {
+			border-collapse: collapse;
+			width: 100%;
+		}
+
+		th,
+		td {
+			padding: 8px;
+			text-align: left;
+			border-bottom: 1px solid #ddd;
+		}
+
+		tr:hover {
+			background-color: #f5f5f5;
+		}
+
+		th {
+			background-color: #4CAF50;
+			color: white;
+		}
+
+		img {
+			max-width: 100px;
+			max-height: 100px;
+		}
+	</style>
+</head>
+
+<body>
+	<!-- 登入後畫面 -->
+	<div id="a-page" style="display: none;">
+		<!-- 登入後畫面 -->
+		<div class="header">
+			<h1>Cloud Image Compress</h1>
+			<button id="signout" onclick="signOut()">Sign out</button>
+		</div>
+		<!-- <h1>Welcome back, <span id="username"></span>!</h1> -->
+		<p>You are now logged in.</p>
+		<form id="uploadForm">
+			<input type="file" name="file" id="fileInput">
+			<button type="submit">Upload</button>
+		</form>
+		<h1>Cloud Image List</h1>
+		<table id="api-response">
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>FileSize</th>
+					<th>FileUnit</th>
+					<th>Link</th>
+					<th>CreateTime</th>
+					<th>Version</th>
+					<th>Image</th>
+				</tr>
+			</thead>
+			<tbody>
+			</tbody>
+		</table>
+	</div>
+	<!-- 登入前畫面 -->
+	<div id="b-page" style="display: none;">
+		<h1>Please log in</h1>
+		<form id="login-form">
+			<div>
+				<label for="account">Account:</label>
+				<input type="text" id="account" name="account">
+			</div>
+			<div>
+				<label for="password">Password:</label>
+				<input type="password" id="password" name="password">
+			</div>
+			<div>
+				<button type="submit">Login</button>
+			</div>
+		</form>
+	</div>
+	<script>
+		$(function () {
+			$('#login-form').submit(function (event) {
+				event.preventDefault(); // 阻止表單自動提交
+				var account = $('#account').val();
+				var password = $('#password').val();
+				var url = '/api/login'; // API的URL
+				var data = { account: account, password: password };
+				// 使用fetch API進行請求
+				fetch(url, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(data)
+				})
+					.then(function (response) {
+						if (!response.ok) {
+							throw new Error('Network response was not ok');
+						}
+						return response.json();
+					})
+					.then(function (json) {
+						if (json.accessToken === "") {
+							throw new Error('');
+						}
+						// 獲得JWT並存儲到localStorage中
+						localStorage.setItem('accessToken', json.accessToken);
+						location.reload();
+					})
+					.catch(function (error) {
+						alert('Login failed');
+					});
+			});
+		});
+	</script>
+	<script>
+		if (accessToken) {
+			// 使用fetch API讀取GET API回傳的JSON資料
+			fetch('/api/list', {
+				method: 'GET',
+				headers: {
+					'Authorization': 'Bearer ' + accessToken
+				}
+			})
+				.then(function (response) {
+					if (response.status === 403) {
+						localStorage.removeItem("accessToken");
+						location.reload();
+					} else {
+						return response.json()
+					}
+				})
+				.then(data => {
+					const table = document.getElementById('api-response').getElementsByTagName('tbody')[0];
+					data.forEach(item => {
+						const row = table.insertRow();
+						const nameCell = row.insertCell();
+						nameCell.textContent = item.name;
+
+						const sizeCell = row.insertCell();
+						sizeCell.textContent = item.filesize;
+
+						const unitCell = row.insertCell();
+						unitCell.textContent = item.fileunit;
+
+						const linkCell = row.insertCell();
+						const link = document.createElement('a');
+						link.textContent = "Download";
+						link.href = `/api/download?filename=${item.link}`;
+						link.addEventListener("click", (event) => {
+							event.preventDefault();
+							fetch(`/api/download?filename=${item.link}`, {
+								method: "GET",
+								headers: {
+									Authorization: `Bearer ${accessToken}`,
+								},
+							})
+								.then((response) => {
+									if (response.ok) {
+										const filename = "download";
+										return response.blob().then((blob) => ({
+											blob,
+											filename,
+										}));
+									} else {
+										throw new Error(
+											`Failed to download file: ${response.statusText}`
+										);
+									}
+								})
+								.then(({ blob, filename }) => {
+									const a = document.createElement("a");
+									const url = URL.createObjectURL(blob);
+									a.href = url;
+									a.download = filename;
+									a.click();
+									URL.revokeObjectURL(url);
+								})
+								.catch((error) => console.error(error));
+						});
+						linkCell.appendChild(link);
+
+						const createTimeCell = row.insertCell();
+						createTimeCell.textContent = item.created;
+						const versionCell = row.insertCell();
+						versionCell.textContent = item.version;
+						const imgCell = row.insertCell();
+						const imgLink = "https://storage.cloud.google.com/image-list/" + item.link
+						imgCell.innerHTML = '<a href="' + imgLink + '" target="_blank"><img src="' + imgLink + '" alt="Image"><a>';
+					});
+				})
+				.catch(error => console.error(error));
+		}
+	</script>
+	<script>
+		const uploadForm = document.getElementById("uploadForm");
+		const fileInput = document.getElementById("fileInput");
+
+		uploadForm.addEventListener("submit", (event) => {
+			event.preventDefault();
+
+			const formData = new FormData();
+			formData.append("file", fileInput.files[0]);
+
+			fetch("/api/upload", {
+				method: "POST",
+				headers: {
+					"Authorization": `Bearer ${accessToken}`
+				},
+				body: formData
+			})
+				.then(response => {
+					if (response.ok) {
+						alert("Upload successful!");
+						location.reload();
+					} else if (response.status === 403) {
+						localStorage.removeItem("accessToken");
+						location.reload();
+					} else {
+						alert("Upload failed!");
+					}
+				})
+				.catch(error => {
+					console.error(error);
+				});
+		});
+	</script>
+	<script>
+		function signOut() {
+			localStorage.removeItem('accessToken');
+			location.reload();
+		}
+	</script>
+</body>
+
+</html>
