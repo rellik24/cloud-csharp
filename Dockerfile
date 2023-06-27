@@ -14,6 +14,9 @@
 
 # Use Microsoft's official build .NET image.
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build-env
+
+COPY NuGet.Config /root/.nuget/NuGet/NuGet.Config
+COPY packages /Users/rellik/project/Cathay/package
 WORKDIR /app
 
 # Copy csproj and restore as distinct layers
